@@ -5,6 +5,13 @@
     <link rel="stylesheet" href="css/style.css">
     <script src="libs/jquery-2.1.0.min.js"></script>
     <script src="libs/peer.js"></script>
+    <script src="libs/svm.js"></script>
+
+    <script src="models/clap.js"></script>
+    <script src="models/whistle.js"></script>
+
+    <script src="javascripts/VoiceAnalyzer.js"></script>
+    <script src="javascripts/Classifier.js"></script>
   </head>
   <body>
     <script src="javascripts/script.js"></script>
@@ -17,9 +24,32 @@
     </div>
 
     <div id="form" class="box">
-      <button id="btnRecord">record</button>
-      <div id="recorded" class="box"></div>
+      <div>
+        <button id="btnRecord">record</button>
+        <label>
+          strong only:
+          <input type="checkbox" id="strong-only">
+        </label>
+      </div>
+
+      <div>
+        <form class="learn">
+          <input type="text" id="c-name" value="clap">
+          <label>
+            1:
+            <input type="radio" name="c-label" value="1" checked>
+          </label>
+          <label>
+            -1:
+            <input type="radio" name="c-label" value="-1">
+          </label>
+          <button type="submit">learn</button>
+        </form>
+      </div>
     </div>
+
+    <div id="recorded" class="box"></div>
+
 
 
   </body>
