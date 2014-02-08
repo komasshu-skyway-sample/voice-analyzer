@@ -34,12 +34,17 @@ var VoiceAnalyzer = function(){
   this.analyzer = this.audioContext.createAnalyser();
   this.mediastreamsource = null;
   this.fftSize = 0;
+  this.flagRecording = false;
+  this.timerRecording = null;
+  this.RECORD_INTERVAL = 5000;
+  this.PRECISE_INTERVAL = 32;
+  this.SUM_THRESH = 5000;
+
+  this.recordedDatas = []
 };
 
 VoiceAnalyzer.prototype.start = function(stream){
-  console.log(this);
   this.mediastreamsource = this.audioContext.createMediaStreamSource(stream);
-  console.dir(this.mediastreamsource);
   this.mediastreamsource.connect(this.analyzer);
   this.fftSize = this.analyzer.fftSize
 
@@ -47,15 +52,85 @@ VoiceAnalyzer.prototype.start = function(stream){
   // this.analyzer.connect(this.audioContext.destination);
 }
 
+VoiceAnalyzer.prototype.startRecording = function(){
+  if(this.flagRecording) {
+    throw("Already started recording...");
+  }
+  this.flagRecording = true;
+  this.recordedDatas.length = 0;
+  $("#recorded").empty();
+  $("#btnRecord").attr("disabled", true);
+
+  this.timerRecording = setTimeout(function(){
+    this.flagRecording = false;
+    this.timerRecording = null;
+    $("#btnRecord").attr("disabled", false);
+  }.bind(this), this.RECORD_INTERVAL);
+}
+
+VoiceAnalyzer.prototype.stopRecording = function(){
+  if(!this.flagRecording) {
+    throw("Recording not started");
+  }
+  this.flagRecording = false;
+  if(this.timerRecording) {
+    clearTimeout(this.timerRecording);
+    this.timerRecording = null;
+    $("#btnRecord").attr("disabled", false);
+  }
+}
+
 VoiceAnalyzer.prototype.getDatas = function(){
   var buffTimeDomain = new Uint8Array(this.fftSize)
-    , buffFrequency = new Uint8Array(this.fftSize)
+    , buffFrequency = new Uint8Array(this.fftSize / 2)
   setInterval(function(ev){
     this.analyzer.getByteTimeDomainData(buffTimeDomain);
     this.analyzer.getByteFrequencyData(buffFrequency);
+    var sum = this.getSum(buffTimeDomain);
+    $("#sum").text(sum);
     drawPCM($("#pcm")[0], buffTimeDomain, "#00f");
     drawPCM($("#fft")[0], buffFrequency, "#f00");
-  }.bind(this), 30);
+
+    if(this.flagRecording) this.recordDatas(buffTimeDomain, buffFrequency, sum);
+  }.bind(this), this.PRECISE_INTERVAL);
+}
+
+VoiceAnalyzer.prototype.getSum = function(datas){
+  var sum = 0;
+  for(var i = 0, l = datas.length; i < l; i++) {
+    sum += Math.abs(datas[i] - 127);
+  };
+  return sum;
+}
+
+
+
+
+VoiceAnalyzer.prototype.recordDatas = function(pcm, fft, sum){
+  var obj = {"pcm": pcm, "fft": fft, "sum": sum, "timestamp": new Date().toString()};
+  this.recordedDatas.push(obj);
+  this.appendGraph(obj);
+}
+
+VoiceAnalyzer.prototype.appendGraph = function(obj /* {"pcm", "fft", "sum", "timestamp"} */) {
+  var $div = $("<div>");
+  var $sum = $("<p>").append($("<span>").text("sum : "+obj.sum));
+  var $fft = $("<canvas>").attr("class", "fft");
+  var $pcm = $("<canvas>").attr("class", "pcm");
+
+  console.log(obj.sum);
+
+  if(obj.sum > this.SUM_THRESH) {
+    $fft.addClass("strong");
+  }
+
+  $div
+    .append($sum)
+    .append($fft)
+    .append($pcm)
+    .appendTo("#recorded");
+  drawPCM($fft[0], obj.fft, "#f00");
+  drawPCM($pcm[0], obj.pcm, "#00f");
 }
 
 
@@ -63,15 +138,22 @@ VoiceAnalyzer.prototype.getDatas = function(){
 ////////////////////////////////////////////////////////////////
 //
 
-navigator.GetUserMedia_ = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+var voiceAnalyzer;
+$(function(){
+  navigator.GetUserMedia_ = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
-var voiceAnalyzer = new VoiceAnalyzer();
+  voiceAnalyzer = new VoiceAnalyzer();
 
 
-navigator.GetUserMedia_({audio:true, video:false}, function(stream) {
-  voiceAnalyzer.start(stream);
-}, function(err) {
-  console.warn(err);
+  navigator.GetUserMedia_({audio:true, video:false}, function(stream) {
+    voiceAnalyzer.start(stream);
+  }, function(err) {
+    console.warn(err);
+  });
+
+  $("#btnRecord").on("click", function(){
+    voiceAnalyzer.startRecording();
+  });
 });
 
 
